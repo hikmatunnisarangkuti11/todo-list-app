@@ -19,7 +19,7 @@ export default function App() {
         breakpoint="lg"
         collapsedWidth="0"
         style={{ backgroundColor: "#001529" }}
-        trigger={null} // matikan default trigger
+        trigger={null} 
       >
         <div
           style={{

@@ -19,7 +19,6 @@ export default function TodoTable() {
   const [editingTodo, setEditingTodo] = useState(null);
   const [searchText, setSearchText] = useState("");
 
-  // ✅ state untuk pagination
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 10,
@@ -36,7 +35,6 @@ export default function TodoTable() {
     setModalVisible(false);
   };
 
-  // ✅ filter berdasarkan search
   const filteredTodos = todos.filter(
     (t) =>
       t.title.toLowerCase().includes(searchText.toLowerCase()) ||
@@ -133,13 +131,12 @@ export default function TodoTable() {
         </Button>
       </div>
 
-      {/* ✅ Bungkus dengan div biar tabel bisa discroll di layar kecil */}
       <div style={{ overflowX: "auto" }}>
         <Table
           columns={columns}
           dataSource={filteredTodos}
           rowKey="id"
-          scroll={{ x: "max-content" }} // ✅ bikin tabel responsif
+          scroll={{ x: "max-content" }} 
           pagination={{
             current: pagination.current,
             pageSize: pagination.pageSize,
