@@ -1,160 +1,419 @@
-1. What database tables did you create and why?
+1. Ringkasan proyek
 
-Categories
-Tabel ini menyimpan daftar kategori untuk todo, berisi kolom id, name, color, created_at, dan updated_at.
-Tujuannya untuk mengelompokkan todo berdasarkan kategori sehingga pengguna bisa memilah todo dengan lebih mudah.
+Aplikasi ini menampilkan daftar todo yang dapat dibuat, diedit, dihapus, dan ditandai selesai/belum selesai. Setiap todo dapat diberi kategori. Fitur utama:
+
+CRUD Todo
+
+CRUD Kategori
+
+Pencarian (search by title)
+
+Pagination dasar (page & limit)
+
+Responsive UI (desktop / tablet / mobile)
+
+Backend RESTful dengan GORM dan PostgreSQL
+
+2. Setup & cara jalankan (lokal)
+Prasyarat
+
+Go 1.20+ (atau versi stabil terbaru)
+
+Node.js 16+ / npm atau yarn
+
+PostgreSQL berjalan di lokal (atau container)
+
+Optional: migrate tool untuk menjalankan migrations (atau jalankan SQL manual)
+
+Environment / .env (backend)
+
+Contoh .env (atau set env secara langsung):
+
+DB_HOST=localhost
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=todoapp
+DB_PORT=5432
+
+Menjalankan backend (Go)
+
+Masuk ke folder backend (atau root yang berisi main.go).
+
+Install dependencies if needed (go mod tidy).
+
+Pastikan database todoapp sudah dibuat:
+
+CREATE DATABASE todoapp;
+
+
+Jalankan:
+
+go run main.go
+
+
+Server akan berjalan di http://localhost:8080.
+
+Catatan: Kode sudah memakai db.AutoMigrate(...) sehingga tabel otomatis dibuat jika belum ada.
+
+Menjalankan frontend (React)
+
+Masuk folder frontend (atau folder React).
+
+Install:
+
+npm install
+# atau
+yarn
+
+
+Jalankan:
+
+npm start
+# atau
+yarn start
+
+
+Buka http://localhost:3000.
+
+3. Struktur project (singkat)
+backend/
+  main.go
+  database/
+    connect.go
+  controllers/
+    todo_controller.go
+    category_controller.go
+  models/
+    todo.go
+    category.go
+  routes/
+    todo_routes.go
+    category_routes.go
+
+frontend/
+  src/
+    App.js
+    context/
+      TodoContext.js
+    components/
+      TodoForm.jsx
+      TodoTable.jsx (atau di App.js)
+    services/
+      api.js (opsional)
+
+4. API Documentation (ringkasan)
+
+Base URL: http://localhost:8080/api
 
 Todos
-Menyimpan daftar tugas (todo) dengan kolom seperti id, title, description, category_id, priority, completed, created_at, dan updated_at.
-Kolom category_id berfungsi sebagai foreign key ke tabel Categories.
-Relasi: Many Todos belong to One Category.
+
+GET /api/todos
+Query params: page (default 1), limit (default 10), search (opsional)
+Response:
+
+{
+  "data": [ { "id":1, "title":"...", ... } ],
+  "pagination": { "current_page":1, "per_page":10, "total":25, "total_pages":3 }
+}
+
+
+GET /api/todos/:id
+Response: todo object atau 404
+
+POST /api/todos
+Body (JSON): { "title","description","category_id","priority","due_date" }
+Response: created todo (201)
+
+PUT /api/todos/:id
+Body: fields yang sama, response: updated todo
+
+DELETE /api/todos/:id
+Response: { "message": "Deleted" }
+
+PATCH /api/todos/:id/complete
+Toggle completed boolean, response: updated todo
+
+Categories
+
+GET /api/categories → { "data": [ ... ] }
+
+POST /api/categories → create
+
+PUT /api/categories/:id → update
+
+DELETE /api/categories/:id → delete
+
+Semua response menggunakan JSON. Error returns contain {"error": "message"}.
+
+5. Migrations (SQL example up/down)
+
+Beri file migrations di migrations/:
+
+001_create_categories.up.sql
+CREATE TABLE categories (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  color VARCHAR(7) DEFAULT '#3B82F6',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+001_create_categories.down.sql
+DROP TABLE IF EXISTS categories;
+
+002_create_todos.up.sql
+CREATE TABLE todos (
+  id SERIAL PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  completed BOOLEAN DEFAULT FALSE,
+  category_id INT REFERENCES categories(id) ON DELETE SET NULL,
+  priority VARCHAR(10) DEFAULT 'low',
+  due_date TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_todos_title ON todos USING btree (title);
+CREATE INDEX idx_todos_category ON todos USING btree (category_id);
+
+002_create_todos.down.sql
+DROP TABLE IF EXISTS todos;
+
+Database Design
+Tabel apa saja yang dibuat dan alasannya?
+
+categories
+
+Menyimpan daftar kategori (Work, Personal, dsb). Mempermudah pengelompokan todo dan filtering.
+
+todos
+
+Menyimpan item todo utama: judul, deskripsi, status completed, foreign key category_id, prioritas, due_date, created/updated timestamp.
+
+Deskripsikan masing-masing tabel & tujuan
+
+categories:
+
+id (PK), name, color, created_at, updated_at.
+
+Tujuan: menyimpan metadata kategori agar UI dapat menampilkan nama dan warna kategori.
+
+todos:
+
+id, title, description, completed (bool), category_id, priority (high|medium|low), due_date, created_at, updated_at.
+
+Tujuan: menyimpan data tugas.
 
 Relasi antar tabel
-Relasi utama adalah satu-ke-banyak (one-to-many) dari Categories ke Todos, karena satu kategori dapat memiliki banyak todo.
 
-Kenapa memilih struktur ini?
-Struktur ini sederhana namun fleksibel, memisahkan kategori dan todo agar data tetap terorganisir dan mudah diperluas. Relasi menggunakan foreign key agar integritas data terjaga.
+todos.category_id → foreign key ke categories.id.
+Relasi: many todos → one category (Many-to-One).
 
-2. How did you handle pagination and filtering in the database?
+Mengapa memilih struktur ini?
 
-Queries untuk filtering dan sorting
+Sederhana & cukup untuk use-case challenge (2 tabel).
 
-Filtering berdasarkan keyword LIKE di kolom name (kategori) atau title dan description (todo).
+Normalisasi: kategori dipisah agar tidak duplikasi string kategori di tiap todo.
 
-Sorting menggunakan ORDER BY pada kolom tertentu (misal tanggal update, nama).
+Memudahkan filter/aggregate per kategori.
 
-Pagination yang efisien
+Bagaimana menangani pagination & filtering di database?
+Query yang digunakan untuk filtering & sorting
 
-Menggunakan query dengan LIMIT dan OFFSET untuk mengambil data per halaman, contohnya:
+Filtering (search by title, case-insensitive) — PostgreSQL:
 
-SELECT * FROM todos WHERE title LIKE '%keyword%' ORDER BY created_at DESC LIMIT 10 OFFSET 20;
+SELECT * FROM todos
+WHERE title ILIKE '%' || :search || '%'
+ORDER BY created_at DESC
+LIMIT :limit OFFSET :offset;
 
 
-Pendekatan ini mencegah pengambilan data berlebih sehingga meningkatkan performa.
+Untuk filter by category / priority / completion:
 
-Index yang ditambahkan
+WHERE category_id = :category_id
+  AND priority = :priority
+  AND completed = :completed
 
-Index pada kolom category_id di tabel Todos untuk mempercepat join dan filter kategori.
+Bagaimana menangani pagination secara efisien
 
-Index pada kolom name (kategori) dan title (todo) untuk mempercepat pencarian (LIKE).
+Gunakan LIMIT + OFFSET untuk pagination sederhana (cukup untuk dataset kecil/menengah).
 
-Index ini meningkatkan performa query terutama saat dataset membesar.
+Dapat dipertimbangkan keyset pagination (a.k.a. cursor-based) untuk skala besar: WHERE created_at < last_seen_created_at ORDER BY created_at DESC LIMIT N.
 
-Technical Decision Questions
-1. How did you implement responsive design?
+Pastikan COUNT(*) dilakukan pada query terpisah atau gunakan COUNT pada query yang sama (dibutuhkan untuk menampilkan total_pages).
 
-Breakpoint yang digunakan
-Menggunakan breakpoint Ant Design md (768px) sebagai batas mobile vs desktop.
+Index apa yang ditambahkan dan alasannya
 
-Adaptasi UI
+idx_todos_title — index b-tree pada kolom title mempercepat search prefix/suffix?
 
-Pada layar besar, sidebar Sider selalu tampil.
+Catatan: b-tree biasa tidak membantu ILIKE '%keyword%' yang memulai wildcard. Untuk ILIKE 'keyword%' b-tree membantu.
 
-Pada mobile, sidebar berubah menjadi Drawer yang bisa dibuka-tutup dengan tombol menu.
+Untuk pencarian substring (ILIKE '%keyword%'), gunakan PostgreSQL GIN index pada to_tsvector (full-text search) atau pg_trgm extension:
 
-Konten utama dan tabel mengikuti lebar layar dan menyesuaikan ukuran.
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX idx_todos_title_trgm ON todos USING gin (title gin_trgm_ops);
+
+
+idx_todos_category — cepatkan filter by category_id.
+
+idx_todos_created_at — cepatkan ordering by created_at jika sering dipakai.
+
+Technical Decisions
+Bagaimana mengimplementasikan desain responsif?
+
+Menggunakan Ant Design responsif utilities dan grid system (Row, Col) serta komponen Table, Drawer/Modal yang adaptif.
+
+Gunakan CSS container with max-width dan padding responsive (media queries) bila perlu.
+
+Breakpoints yang digunakan & alasannya
+
+Ant Design standard breakpoints:
+
+xs < 576px (mobile)
+
+sm ≥ 576px (tablet kecil)
+
+md ≥ 768px (tablet)
+
+lg ≥ 992px (desktop)
+
+xl ≥ 1200px (desktop besar)
+
+Mengikuti Ant Design memudahkan karena komponen sudah disesuaikan.
+
+Bagaimana UI beradaptasi di berbagai layar
+
+Desktop: tampilkan tabel penuh, side filters, actions visible.
+
+Tablet: tabel tetap, kolom berkurang atau disingkat (hide less penting).
+
+Mobile: ubah ke kartu/list vertical, atau tabel dengan horizontal scroll; gunakan drawer/modal untuk form.
 
 Komponen Ant Design yang membantu
 
-Layout dengan Sider, Header, dan Content
+Table — list & pagination
 
-Drawer untuk menu pada mobile
+Input.Search — search bar
 
-Grid.useBreakpoint untuk mendeteksi ukuran layar
+Modal / Drawer — form create/edit
 
-2. How did you structure your React components?
+Form, Select, DatePicker — input form
 
-Hierarki komponen
+Row / Col — layout responsive
 
-App sebagai root, mengatur layout dan navigasi.
+Tag / Badge — priority & category label
 
-TodoPage dan CategoryPage sebagai halaman utama, memuat tabel dan form terkait.
+Bagaimana struktur komponen React?
+Hierarki komponen (contoh)
+App
+ └─ TodoProvider (Context)
+    └─ TodoPage
+       ├─ Header (Search, Add button)
+       ├─ TodoTable (Table, Actions)
+       ├─ TodoForm (Modal / Drawer)
+       └─ CategoryManager (opsional)
 
-TodoTable dan CategoryTable untuk menampilkan data dengan fitur search, pagination, dan modal form.
+Bagaimana state dikelola antar komponen
 
-DeleteConfirm untuk konfirmasi penghapusan data.
+Global state via React Context (TodoContext): todos, categories, loading, fungsi CRUD (fetchTodos, createTodo, updateTodo, deleteTodo, toggleComplete).
 
-State management
+Lokal state di komponen untuk UI-only states: modal visibility, editingTodo, local search input before submit (debounced).
 
-Menggunakan Context API (TodoContext dan CategoryContext) untuk state global data (todos dan categories).
+Bagaimana state filtering & pagination dikelola
 
-State lokal untuk modal, search, pagination, dan form kontrol.
+fetchTodos(search, page, limit, filters) berada di Context; komponen UI (Header / Table) memanggil fetchTodos dengan parameter.
 
-Handling filtering dan pagination
+Pagination state (current page, per_page) bisa disimpan di Context atau lokal di TodoTable — jika banyak komponen perlu mengakses, simpan di Context.
 
-State searchText dan currentPage disimpan di masing-masing tabel.
+Arsitektur backend yang dipilih & alasannya
+Pilihan
 
-Data difilter dan dipaginasi secara lokal berdasarkan state ini sebelum di-render.
+Gin (web framework) + GORM (ORM) + PostgreSQL.
 
-3. What backend architecture did you choose and why?
+Struktur: models/, controllers/, routes/, database/.
 
-API route organization
+Struktur API routes
 
-Menggunakan REST API dengan endpoint /categories dan /todos.
+routes/todo_routes.go untuk todos
 
-Setiap resource memiliki controller sendiri (CategoryController, TodoController).
+routes/category_routes.go untuk categories
 
-Struktur kode
+controllers/* dapat memuat logic lebih rinci bila route menjadi ringkas
 
-Memisahkan controllers untuk business logic dan models untuk representasi data.
+Struktur kode (controllers, services, dll.)
 
-database package mengatur koneksi DB dan migrasi.
+models/ — struktur GORM models
 
-Error handling
+database/connect.go — koneksi DB & AutoMigrate
 
-Menggunakan status HTTP yang sesuai (400 untuk validation error, 404 untuk not found, 500 untuk server error).
+controllers/ — handler fungsi (GetTodos, CreateTodo, dll.)
 
-Mengirim response error dalam format JSON dengan pesan deskriptif.
+routes/ — menghubungkan route ke controller
 
-4. How did you handle data validation?
+(opsional) services/ — logika bisnis terpisah dari controllers jika app berkembang
 
-Validasi data
+Penanganan error
 
-Dilakukan di backend dengan binding dan validasi struct (contoh: binding:"required" di Gin).
+Gunakan c.JSON(statusCode, gin.H{"error": err.Error()}) untuk pesan error standar.
 
-Validasi tambahan seperti unik nama kategori dicek dengan query sebelum create/update.
+Validasi input return 400, not found return 404, server error return 500.
 
-Di frontend juga ada validasi form menggunakan Ant Design Form rules agar user mendapat feedback langsung.
+Logging kesalahan di server (log.Print / structured logs).
 
-Rules validasi
+Bagaimana menangani validasi data?
+Validasi di frontend, backend, atau keduanya?
 
-Nama kategori wajib diisi dan tidak boleh duplikat.
+Keduanya:
 
-Field lain seperti todo title wajib diisi.
+Frontend: validasi UI (required fields, format tanggal, panjang judul) menggunakan Ant Design Form rules untuk pengalaman user cepat.
 
-Kenapa kedua sisi?
+Backend (wajib): validasi menyeluruh karena frontend bisa dimanipulasi. Validasi ini adalah lapisan keamanan dan integritas data.
 
-Frontend validation untuk user experience lebih baik.
+Rules yang diterapkan
 
-Backend validation untuk keamanan dan menjaga integritas data.
+title — required, max length (mis. 255)
 
-Testing & Quality Questions
-1. What did you choose to unit test and why?
+priority — enum high|medium|low
 
-Fokus testing pada fungsi CRUD backend dan validasi, memastikan data valid dan error ditangani dengan benar.
+category_id — harus ada di table categories (atau null jika optional)
 
-Fungsi-fungsi utilitas di frontend seperti filter dan pagination juga diuji agar UI konsisten.
+due_date — valid timestamp ISO
 
-Pertimbangan edge case seperti input kosong, duplikat, dan data tidak ditemukan.
+completed — boolean
 
-2. If you had more time, what would you improve or add?
+Mengapa memilih pendekatan tersebut
 
-Technical debt
+UX: validasi di frontend meminimalkan request yang gagal.
 
-Menambahkan test coverage lebih lengkap, terutama integrasi API dan UI testing.
+Keamanan & integritas: server-side validation memastikan DB tidak terisi data invalid dari client yang dimanipulasi.
 
-Refactor kode agar lebih modular dan scalable.
+7. Testing & Quality
+Apa yang diuji di unit test & alasannya
 
-Fitur tambahan
+Prioritas untuk bonus:
 
-Autentikasi user dan otorisasi.
+Controller logic: memastikan endpoints mengembalikan status & payload yang tepat.
 
-Fitur drag-and-drop todo dan reorder kategori.
+Service / business logic (jika dipisah): memastikan aturan toggle complete, validasi, dan transformasi data benar.
 
-Integrasi notifikasi atau reminder.
+DB layer (model): create/read/update/delete basic flows (menggunakan test DB).
 
-Refactor
+Fungsi/metode apa saja yang diuji
 
-Pisahkan logic API ke layer service untuk pemisahan concern yang lebih baik.
+GetTodos dengan/ tanpa search & pagination
 
-Optimasi performa query dan caching.
+CreateTodo valid input & invalid input
+
+ToggleTodoCompletion behavior
+
+DeleteTodo non-existent id -> returns 404
+
+Edge case yang diperhitungkan
+
+Search dengan karakter khusus
+
+Update pada todo yang tidak ada
+
+Create dengan category_id yang tidak ada
+
+Large pagination numbers (page > total pages)
