@@ -2,6 +2,7 @@ package routes
 
 import (
 	"net/http"
+	"time"
 	"todo-app/database"
 	"todo-app/models"
 
@@ -21,11 +22,22 @@ func CategoryRoutes(r *gin.Engine) {
 	})
 
 	api.POST("/", func(c *gin.Context) {
-		var cat models.Category
-		if err := c.ShouldBindJSON(&cat); err != nil {
+		var input struct {
+			Name  string `json:"name" binding:"required"`
+			Color string `json:"color" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+
+		cat := models.Category{
+			Name:      input.Name,
+			Color:     input.Color,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}
+
 		if err := database.DB.Create(&cat).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -41,12 +53,10 @@ func CategoryRoutes(r *gin.Engine) {
 			return
 		}
 
-		// Bind input data to separate struct supaya tidak overwrite ID, CreatedAt dll
 		var input struct {
 			Name  string `json:"name" binding:"required"`
-			Color string `json:"color"`
+			Color string `json:"color" binding:"required"`
 		}
-
 		if err := c.ShouldBindJSON(&input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -54,12 +64,12 @@ func CategoryRoutes(r *gin.Engine) {
 
 		cat.Name = input.Name
 		cat.Color = input.Color
+		cat.UpdatedAt = time.Now()
 
 		if err := database.DB.Save(&cat).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-
 		c.JSON(http.StatusOK, cat)
 	})
 
